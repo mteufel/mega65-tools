@@ -15,7 +15,7 @@
 #define ARG_COREVERSION   argv[4]
 #define ARG_COREPATH      argv[5]
 
-static const int CORE_HEADER_SIZE = 4096;
+#define CORE_HEADER_SIZE 4096
 static const int BITSTREAM_HEADER_FPGA_PART_LOC = 0x4C;
 
 static unsigned char bitstream_data[MAX_MB*BYTES_IN_MEGABYTE];
@@ -36,6 +36,20 @@ static m65target_info m65targets[] =
 // NOTE: Append future revision details to end of this array
 
 static int m65target_count = sizeof(m65targets) / sizeof(m65target_info);
+
+#pragma pack(push, 1)
+typedef union
+{
+  char data[CORE_HEADER_SIZE];
+  struct
+  {
+    char magic[16];
+    char core_name[32];
+    char core_version[32];
+    char m65_target[32];
+  };
+} header_info;
+#pragma pack(pop)
 
 
 void split_out_and_print_m65target_names(m65target_info* m65target)
@@ -66,7 +80,7 @@ void show_mega65_target_name_list(void)
 
 void show_help(void)
 {
-  fprintf(stderr, "MEGA65 bitstream to core file converter v0.0.4.\n"
+  fprintf(stderr, "MEGA65 bitstream to core file converter v0.0.5.\n"
                   "---------------------------------------\n"
                   "Usage: <m65target> <foo.bit> <core name> <core version> <out.cor>\n"
                   "\n"
@@ -188,8 +202,7 @@ int check_bitstream_file(m65target_info* m65target, int bit_size)
   return 0;
 }
 
-
-void write_core_file(const int bit_size, const char* core_name, const char* core_version, const char* core_filename)
+void write_core_file(const int bit_size, const char* core_name, const char* core_version, const char* m65target_name, const char* core_filename)
 {
   FILE *of = fopen(core_filename, "wb");
   if (!of) {
@@ -197,20 +210,19 @@ void write_core_file(const int bit_size, const char* core_name, const char* core
     exit(-3);
   }
 
-  // Write magic bytes (16 bytes long)
-  fprintf(of, MAGIC_STR);
-
   // Write core file name and version
-  char header_block[CORE_HEADER_SIZE - MAGIC_LEN];
-  memset(header_block, 0, CORE_HEADER_SIZE - MAGIC_LEN);
+  header_info header_block;
 
-  for(int i = 0; (i < 32) && core_name[i]; i++)
-    header_block[i] = core_name[i];
+  memset(header_block.data, 0, CORE_HEADER_SIZE);
 
-  for(int i = 0; (i<32) && core_version[i]; i++)
-    header_block[32 + i] = core_version[i];
+  for(int i = 0; i<16; i++)
+    header_block.magic[i] = MAGIC_STR[i];
 
-  fwrite(header_block, CORE_HEADER_SIZE - MAGIC_LEN, 1, of);
+  strcpy(header_block.core_name, core_name);
+  strcpy(header_block.core_version, core_version);
+  strcpy(header_block.m65_target, m65target_name);
+
+  fwrite(header_block.data, CORE_HEADER_SIZE, 1, of);
   fwrite(bitstream_data, bit_size, 1, of);
   fclose(of);
 
@@ -236,7 +248,7 @@ int main(int argc,char **argv)
   if (err != 0)
     return err;
 
-  write_core_file(bit_size, ARG_CORENAME, ARG_COREVERSION, ARG_COREPATH);
+  write_core_file(bit_size, ARG_CORENAME, ARG_COREVERSION, ARG_M65TARGETNAME, ARG_COREPATH);
 
   return 0;
 } 
