@@ -1783,7 +1783,7 @@ int main(int argc, char** argv)
     timestamp_msg("");
     fprintf(stderr, "Loading file '%s'\n", filename);
 
-    unsigned int load_routine_addr = 0xf664;
+    unsigned int load_routine_addr = 0xffd5;
 
     int filename_matches = 0;
     int first_time = 1;
